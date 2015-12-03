@@ -39,7 +39,7 @@ public class CricularMenu extends FrameLayout implements Handler.Callback{
 
     private BaseCricularMenuAdapter mAdapter;
 
-    private int mChildAngle;
+    private float mChildAngle;
 
     private PointF mCenterPointF = new PointF();
 
@@ -163,10 +163,12 @@ public class CricularMenu extends FrameLayout implements Handler.Callback{
 
         if(mInLayout && mAdapter != null
                 && mAdapter.getDataSource() != null && mAdapter.getDataSource().size() > 0) {
+            mInRefresh = false;
+
             int totalChildSize = mAdapter.getDataSource().size();
             mChildAngle = 360 / totalChildSize;
 
-            int totalAngle = mChildAngle;
+            float totalAngle = mChildAngle;
             for (int i = 0; i < totalChildSize; i++) {
 
                 View childView = mAdapter.getView(i);

@@ -3,9 +3,10 @@ package com.hope.circularmenu.widget;
 import android.content.Context;
 import android.database.DataSetObserver;
 import android.graphics.PointF;
+import android.os.Handler;
+import android.os.Message;
 import android.os.Parcelable;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.Animation;
@@ -23,9 +24,13 @@ import java.util.List;
  *
  * Created by Hope on 15/12/1.
  */
-public class CricularMenu extends FrameLayout {
+public class CricularMenu extends FrameLayout implements Handler.Callback{
+
+    private static final int HANDLER_CODE_DELAYED = 1;
 
     private static final String TAG = CricularMenu.class.getSimpleName();
+
+    private Handler mHandler = null;
 
     /**
      * 半径
@@ -37,6 +42,8 @@ public class CricularMenu extends FrameLayout {
     private int mChildAngle;
 
     private PointF mCenterPointF = new PointF();
+
+    private int mCurrentItem = 0;
 
     private int mChildWidth;
     private int mChildHeight;
@@ -57,19 +64,23 @@ public class CricularMenu extends FrameLayout {
     }
 
     private void init() {
-        radius = dip2px(getContext(), 90);
+        radius = dip2px(getContext(), 100);
 
         mChildWidth = dip2px(getContext(), 50);
         mChildHeight = dip2px(getContext(), 50);
     }
 
-    private class AdapterDataSetObserver extends DataSetObserver {
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        mHandler = new Handler(this);
+    }
 
-        @Override
-        public void onChanged() {
-            super.onChanged();
-            refreshViews();
-        }
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        mHandler.removeCallbacksAndMessages(null);
+        mHandler = null;
     }
 
 
@@ -81,6 +92,48 @@ public class CricularMenu extends FrameLayout {
         this.mAdapter = adapter;
         this.mAdapter.registerDataSetObserver(new AdapterDataSetObserver());
     }
+
+    @Override
+    public boolean handleMessage(Message msg) {
+        switch (msg.what) {
+            case HANDLER_CODE_DELAYED:
+                if (mChildDataSource != null && mChildDataSource.size() > 0 && mChildDataSource.size() > mCurrentItem) {
+
+                    ChildViewModel entity = (ChildViewModel) msg.obj;
+                    new ChildAnimation(entity).start();
+
+                    mCurrentItem += 1;
+
+                    if(mChildDataSource.size() > mCurrentItem) {
+                        sendMessageToNext();
+                    }
+                    break;
+                }
+        }
+        return false;
+    }
+
+    private void sendMessageToNext() {
+        final ChildViewModel entity = mChildDataSource.get(mCurrentItem);
+
+        Message msg = Message.obtain();
+        msg.what = HANDLER_CODE_DELAYED;
+        msg.obj = entity;
+
+        if (mHandler != null) {
+            mHandler.sendMessageDelayed(msg, 150);
+        }
+    }
+
+    private class AdapterDataSetObserver extends DataSetObserver {
+
+        @Override
+        public void onChanged() {
+            super.onChanged();
+            refreshViews();
+        }
+    }
+
 
     private boolean mInLayout = false;
 
@@ -100,12 +153,6 @@ public class CricularMenu extends FrameLayout {
         }
     }
 
-    @Override
-    protected void onFinishInflate() {
-        super.onFinishInflate();
-
-//        refreshViews();
-    }
 
     private boolean mInRefresh = false;
 
@@ -166,17 +213,19 @@ public class CricularMenu extends FrameLayout {
 
     private void translateAnimation() {
         if(mChildDataSource != null && mChildDataSource.size() > 0) {
-            int size = mChildDataSource.size();
-            for (int i = 0; i < size; i++) {
-                final ChildViewModel entity = mChildDataSource.get(i);
+            mCurrentItem = 0;
 
-                new ChildAnimation(entity).start();
-            }
+            postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    sendMessageToNext();
+                }
+            }, 50);
         }
     }
 
     private class ChildAnimation extends AnimationSet implements Animation.AnimationListener{
-        private static final int ANIM_DURATION = 250;
+        private static final int ANIM_DURATION = 100;
 
         private ChildViewModel mChildView;
 
@@ -190,14 +239,11 @@ public class CricularMenu extends FrameLayout {
             ScaleAnimation scaleAnim = new ScaleAnimation(0.0F, 1.0F,
                     0.0F, 1.0F,
                     Animation.RELATIVE_TO_SELF, 0.5F, Animation.RELATIVE_TO_SELF, 0.5F);
-            scaleAnim.setDuration(ANIM_DURATION);
-//            addAnimation(scaleAnim);
+            addAnimation(scaleAnim);
 
             mTranslateAnim = new TranslateAnimation(Animation.ABSOLUTE, -(mChildView.leftMargin - mCenterPointF.x + mChildView.width / 2),
                     Animation.ABSOLUTE, 0,
                     Animation.ABSOLUTE, -(mChildView.topMargin - mCenterPointF.y + mChildView.height), Animation.ABSOLUTE, 0);
-
-            mTranslateAnim.setDuration(ANIM_DURATION);
 
             addAnimation(mTranslateAnim);
 
@@ -217,14 +263,11 @@ public class CricularMenu extends FrameLayout {
 
         @Override
         public void onAnimationStart(Animation animation) {
-
-            Log.d(TAG, "onAnimationStart ");
             mChildView.view.setVisibility(View.VISIBLE);
         }
 
         @Override
         public void onAnimationEnd(Animation animation) {
-            Log.d(TAG, "onAnimationEnd ");
             mChildView.view.setVisibility(View.VISIBLE);
         }
 
